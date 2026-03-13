@@ -22,9 +22,9 @@ Gunakan akun berikut untuk mengakses sistem.
 
 | Role     | Email                                               | Password |
 | -------- | --------------------------------------------------- | -------- |
-| Admin    | [admin@admin.com]    | admin |
-| Approver  | [budi-santoso@gmail.com]   | password |
-| Approver | [andi-wijaya@gmail.com] | password |
+| Admin    | admin@admin.com    | admin |
+| Approver  | budi-santoso@gmail.com   | password |
+| Approver | andi-wijaya@gmail.com | password |
 
 ---
 
@@ -79,7 +79,11 @@ php artisan key:generate
 
 6. Atur konfigurasi database di file `.env`
 
-7. import db vehicle_management.sql di phpmyadmin
+7. Lakukan Migrasi dan Seeds
+
+```
+php artisan migrate --seed
+```
 
 8. Jalankan aplikasi
 
