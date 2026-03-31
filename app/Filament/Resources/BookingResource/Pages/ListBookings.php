@@ -3,6 +3,8 @@
 namespace App\Filament\Resources\BookingResource\Pages;
 
 use App\Filament\Resources\BookingResource;
+use App\Filament\Resources\BookingResource\Widgets\BookingStats;
+use App\Filament\Widgets\DashboardFilter;
 use Filament\Actions;
 use Filament\Resources\Pages\ListRecords;
 
@@ -14,6 +16,14 @@ class ListBookings extends ListRecords
     {
         return [
             Actions\CreateAction::make(),
+        ];
+    }
+
+    protected function getHeaderWidgets(): array
+    {
+        return [
+            DashboardFilter::class,
+            BookingStats::class,
         ];
     }
 }

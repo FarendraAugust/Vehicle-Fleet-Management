@@ -8,8 +8,8 @@ Aplikasi ini dibuat untuk membantu perusahaan dalam mengelola kendaraan, melakuk
 
 | Komponen         | Versi                          |
 | ---------------- | ------------------------------ |
-| PHP              | 8.2                            |
-| Database         | MySQL 8                        |
+| PHP              | 8.3.30                         |
+| Database         | 8.4.3 - MySQL Community Server |
 | Framework        | Laravel 11                     |
 | Admin Panel      | Filament 3                     |
 | Library Tambahan | Filament Shield, Laravel Excel |

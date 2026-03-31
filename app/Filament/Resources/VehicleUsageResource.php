@@ -4,6 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\VehicleUsageResource\Pages;
 use App\Models\VehicleUsage;
+use Carbon\Carbon;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Forms\Components\Section;
@@ -25,6 +26,11 @@ class VehicleUsageResource extends Resource
 
     protected static ?int $navigationSort = 6;
 
+    public static function getNavigationBadge(): ?string
+    {
+        return \App\Models\Booking::where('status', 'approved')->count();
+    }
+
     public static function getPluralModelLabel(): string
     {
         return 'Vehicle Returns';
@@ -42,35 +48,69 @@ class VehicleUsageResource extends Resource
             ->recordAction(null)
             ->columns([
 
-                TextColumn::make('vehicle.plate_number')
-                    ->label('Vehicle')
-                    ->icon('heroicon-m-truck'),
+                // 🚗 Vehicle Image
+                Tables\Columns\ImageColumn::make('vehicle.image')
+                    ->size(40)
+                    ->label(''),
 
-                TextColumn::make('vehicle.brand')
-                    ->label('Brand'),
+                // 🚗 Vehicle Info (plate + brand)
+                TextColumn::make('vehicle')
+                    ->label('Vehicle')
+                    ->weight('bold')
+                    ->searchable(query: function ($query, $search) {
+                        $query->whereHas('vehicle', function ($q) use ($search) {
+                            $q->where('plate_number', 'like', "%{$search}%")
+                                ->orWhere('brand', 'like', "%{$search}%")
+                                ->orWhere('model', 'like', "%{$search}%");
+                        });
+                    })
+                    ->state(fn($record) => $record->vehicle?->plate_number)
+                    ->description(
+                        fn($record) =>
+                        $record->vehicle?->brand . ' ' . $record->vehicle?->model
+                    ),
+
+                // 👨‍✈️ Driver
+                Tables\Columns\ImageColumn::make('driver.image')
+                    ->size(40)
+                    ->circular()
+                    ->label(''),
 
                 TextColumn::make('driver.name')
                     ->label('Driver')
-                    ->icon('heroicon-m-user'),
+                    ->searchable(query: function ($query, $search) {
+                        $query->whereHas('driver', function ($q) use ($search) {
+                            $q->where('name', 'like', "%{$search}%");
+                        });
+                    })
+                    ->state(fn($record) => $record->driver?->name ?? '-')
+                    ->description(fn($record) => $record->driver?->license_number),
 
+                // 📍 Destination
                 TextColumn::make('destination')
                     ->label('Destination')
-                    ->icon('heroicon-m-map-pin'),
+                    ->icon('heroicon-m-map-pin')
+                    ->limit(30)
+                    ->tooltip(fn($record) => $record->destination),
 
-                TextColumn::make('start_date')
-                    ->label('Start Date')
-                    ->dateTime(),
-
-                TextColumn::make('end_date')
-                    ->label('End Date')
-                    ->dateTime(),
+                // 📅 Schedule
+                TextColumn::make('schedule')
+                    ->label('Schedule')
+                    ->icon('heroicon-m-calendar-date-range')
+                    ->state(
+                        fn($record) =>
+                        Carbon::parse($record->start_date)->format('d M H:i')
+                            . ' → ' .
+                            Carbon::parse($record->end_date)->format('d M H:i')
+                    )
+                    ->color('gray'),
 
             ])
             ->actions([
                 Tables\Actions\Action::make('return_vehicle')
                     ->label('Return Vehicle')
                     ->icon('heroicon-m-arrow-uturn-left')
-                    ->color('success')
+                    ->color('danger')
 
                     ->requiresConfirmation()
 
@@ -78,7 +118,7 @@ class VehicleUsageResource extends Resource
 
                     ->modalDescription(function ($record) {
 
-                        if (now()->lt($record->end_date)) {
+                        if (Carbon::now()->lt($record->end_date)) {
                             return 'This booking has not reached its scheduled end time. Are you sure you want to return the vehicle early?';
                         }
 
@@ -97,6 +137,7 @@ class VehicleUsageResource extends Resource
                         TextInput::make('end_odometer')
                             ->label('End Odometer (km)')
                             ->numeric()
+                            ->minValue(fn($record) => $record->vehicle->current_odometer)
                             ->required(),
 
                     ])
@@ -117,13 +158,19 @@ class VehicleUsageResource extends Resource
                             'status' => 'completed'
                         ]);
 
+                        // set driver
+                        $record->driver()->update([
+                            'status' => 'available'
+                        ]);
+
                         // vehicle available again
                         $record->vehicle()->update([
                             'status' => 'available',
                             'current_odometer' => $data['end_odometer']
                         ]);
                     })
-            ]);
+            ])
+            ->paginated(false);
     }
 
     public static function getEloquentQuery(): \Illuminate\Database\Eloquent\Builder

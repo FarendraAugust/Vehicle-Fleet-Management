@@ -4,13 +4,26 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\ApprovalResource\Pages;
 use App\Models\Approval;
+use App\Models\Vehicle;
+use Carbon\Carbon;
 use Filament\Forms;
 use Filament\Forms\Form;
+use Filament\Infolists\Components\ImageEntry;
+use Filament\Infolists\Components\TextEntry;
+use Filament\Infolists\Infolist;
 use Filament\Resources\Resource;
 use Filament\Tables;
+use Filament\Tables\Columns\BadgeColumn;
+use Filament\Tables\Columns\Column;
+use Filament\Tables\Columns\ImageColumn;
+use Filament\Tables\Columns\Layout\Split;
+use Filament\Tables\Columns\Layout\Stack;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
+use Filament\Infolists\Components\Section as InfoSection;
 
 class ApprovalResource extends Resource
 {
@@ -20,9 +33,14 @@ class ApprovalResource extends Resource
 
     protected static ?string $navigationLabel = 'Approvals';
 
-    protected static ?string $navigationGroup = 'Fleet Management';
+    protected static ?string $navigationGroup = 'Fleet Operations';
 
     protected static ?int $navigationSort = 2;
+
+    public static function getNavigationBadge(): ?string
+    {
+        return static::getModel()::where('status', 'pending')->count();
+    }
 
     public static function canCreate(): bool
     {
@@ -37,94 +55,134 @@ class ApprovalResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
+
+            ->recordUrl(false)
+
             ->columns([
-                Tables\Columns\Layout\Stack::make([
 
-                    Tables\Columns\TextColumn::make('vehicle')
-                        ->label('Vehicle')
-                        ->icon('heroicon-m-truck')
-                        ->badge()
-                        ->color('info')
-                        ->state(
-                            fn($record) =>
-                            optional($record->booking->vehicle)->plate_number .
-                                ' - ' .
-                                optional($record->booking->vehicle)->brand .
-                                ' ' .
-                                optional($record->booking->vehicle)->model
-                        ),
+                ImageColumn::make('image')
+                    ->size(40)
+                    ->label('')
+                    ->state(fn($record) => $record->booking->vehicle?->image),
 
-                    Tables\Columns\TextColumn::make('driver')
-                        ->label('Driver')
-                        ->icon('heroicon-m-user')
-                        ->badge()
-                        ->color('success')
-                        ->state(
-                            fn($record) =>
-                            optional($record->booking->driver)->name ?? 'No Driver'
-                        ),
+                TextColumn::make('vehicle')
+                    ->label('Vehicle')
+                    ->searchable(query: function ($query, $search) {
+                        $query->whereHas('booking.vehicle', function ($q) use ($search) {
+                            $q->where('plate_number', 'like', "%{$search}%")
+                                ->orWhere('brand', 'like', "%{$search}%")
+                                ->orWhere('model', 'like', "%{$search}%");
+                        });
+                    })
+                    ->weight('bold')
+                    ->description(
+                        fn($record) =>
+                        optional($record->booking->vehicle)->brand . ' ' .
+                            optional($record->booking->vehicle)->model
+                    )
+                    ->state(
+                        fn($record) =>
+                        optional($record->booking->vehicle)->plate_number
+                    ),
 
-                    Tables\Columns\TextColumn::make('booking.destination')
-                        ->label('Destination')
-                        ->icon('heroicon-m-map-pin')
-                        ->weight('bold'),
+                ImageColumn::make('driver_image')
+                    ->size(40)
+                    ->label('')
+                    ->circular()
+                    ->state(
+                        fn($record) =>
+                        $record->booking->driver?->image
+                    ),
 
-                    Tables\Columns\TextColumn::make('booking.purpose')
-                        ->label('Purpose')
-                        ->limit(60)
-                        ->color('gray'),
+                TextColumn::make('driver_name')
+                    ->label('Driver')
+                    ->searchable(query: function ($query, $search) {
+                        $query->whereHas('booking.driver', function ($q) use ($search) {
+                            $q->where('name', 'like', "%{$search}%");
+                        });
+                    })
+                    ->state(fn($record) => $record->booking->driver?->name ?? "-")
+                    ->description(
+                        fn($record) => $record->booking->driver?->license_number
+                    ),
 
-                    Tables\Columns\TextColumn::make('booking.start_date')
-                        ->label('Start')
-                        ->dateTime('d M Y H:i')
-                        ->icon('heroicon-m-calendar'),
+                TextColumn::make('destination')
+                    ->label('Destination')
+                    ->searchable(query: function ($query, $search) {
+                        $query->whereHas('booking', function ($q) use ($search) {
+                            $q->where('destination', 'like', "%{$search}%");
+                        });
+                    })
+                    ->icon('heroicon-m-map-pin')
+                    ->weight('medium')
+                    ->state(fn($record) => $record->booking?->destination ?? '-')
+                    ->limit(30),
 
-                    Tables\Columns\TextColumn::make('booking.end_date')
-                        ->label('End')
-                        ->dateTime('d M Y H:i')
-                        ->icon('heroicon-m-calendar-days'),
+                TextColumn::make('purpose')
+                    ->label('Purpose')
+                    ->color('gray')
+                    ->size('sm')
+                    ->state(fn($record) => $record->booking?->purpose ?? '-')
+                    ->limit(40)
+                    ->tooltip(fn($state) => $state),
 
-                    Tables\Columns\TextColumn::make('level')
-                        ->label('Approval Level')
-                        ->badge()
-                        ->color(fn($state) => $state == 1 ? 'info' : 'warning'),
+                TextColumn::make('schedule')
+                    ->label('Schedule')
+                    ->searchable(query: function ($query, $search) {
+                        $query->whereHas('booking', function ($q) use ($search) {
+                            $q->where('start_date', 'like', "%{$search}%")
+                                ->orWhere('end_date', 'like', "%{$search}%");
+                        });
+                    })
+                    ->icon('heroicon-m-calendar-date-range')
+                    ->state(
+                        fn($record) =>
+                        Carbon::parse($record->booking->start_date)->format('d M H:i')
+                            . ' → ' .
+                            Carbon::parse($record->booking->end_date)->format('d M H:i')
+                    )
+                    ->color('gray'),
 
-                    Tables\Columns\BadgeColumn::make('status')
-                        ->colors([
-                            'warning' => 'pending',
-                            'success' => 'approved',
-                            'danger'  => 'rejected',
-                        ]),
-
-                    Tables\Columns\TextColumn::make('notes')
-                        ->label('Notes')
-                        ->limit(50)
-                        ->color('gray'),
-
-                ])
-                    ->space(3)
-                    ->extraAttributes([
-                        'class' => '
-                w-full
-                p-6
-                rounded-xl
-                border
-                bg-white dark:bg-gray-900
-                shadow-sm
-                hover:shadow-xl
-                transition
-            ',
+                BadgeColumn::make('status')
+                    ->label('Status')
+                    ->formatStateUsing(fn($state) => ucfirst($state))
+                    ->colors([
+                        'warning' => 'pending',
+                        'success' => 'approved',
+                        'danger'  => 'rejected',
                     ]),
+
+                TextColumn::make('level')
+                    ->label('Level')
+                    ->searchable()
+                    ->badge()
+                    ->color(fn($state) => $state == 1 ? 'info' : 'warning'),
+
+                TextColumn::make('notes')
+                    ->label('Notes')
+                    ->limit(30)
+                    ->tooltip(fn($state) => $state)
+                    ->color('gray')
+
             ])
 
+            ->defaultSort('status', 'asc')
+            ->filters([
+                SelectFilter::make('status')
+                    ->options([
+                        'pending' => 'Pending',
+                        'approved' => 'Approved',
+                        'rejected' => 'Rejected',
+                    ])
+                    ->default(null), // penting biar gak override query awal
+            ])
 
             ->actions([
 
                 Tables\Actions\ViewAction::make()
-                    ->label('View Details')
+                    ->label('View')
                     ->icon('heroicon-m-eye')
                     ->color('gray')
-                    ->button()
                     ->size('lg'),
 
                 Tables\Actions\Action::make('reject')
@@ -146,13 +204,38 @@ class ApprovalResource extends Resource
                             ->required()
                             ->rows(3),
                     ])
-
                     ->action(function ($record, $data) {
+
+                        // update current (level 1)
                         $record->update([
                             'status' => 'rejected',
                             'approved_at' => now(),
-                            'notes' => $data['notes'],
+                            'notes' => $data['notes'] ?? null,
                         ]);
+
+                        // 🔥 kalau level 1 reject → paksa level 2 ikut reject
+                        if ($record->level == 1) {
+
+                            Approval::where('booking_id', $record->booking_id)
+                                ->where('level', 2)
+                                ->update([
+                                    'status' => 'rejected',
+                                    'approved_at' => now(),
+                                    'notes' => 'Auto rejected (level 1 rejected)',
+                                ]);
+
+                            // juga update booking
+                            $record->booking()->update([
+                                'status' => 'rejected'
+                            ]);
+                        }
+
+                        // existing logic level 2
+                        if ($record->level == 2) {
+                            $record->booking()->update([
+                                'status' => 'rejected'
+                            ]);
+                        }
                     }),
 
                 Tables\Actions\Action::make('approve')
@@ -187,6 +270,16 @@ class ApprovalResource extends Resource
                             $record->booking()->update([
                                 'status' => 'approved'
                             ]);
+
+                            $record->booking->vehicle->update([
+                                'status' => 'in_use',
+                            ]);
+
+                            if ($record->booking->driver) {
+                                $record->booking->driver()->update([
+                                    'status' => 'assigned',
+                                ]);
+                            }
                         }
                     })
 

@@ -32,7 +32,7 @@ class RegionResource extends Resource
 
     protected static ?string $navigationGroup = 'Company Management';
 
-    protected static ?int $navigationSort = 1;
+    protected static ?int $navigationSort = 99;
 
     public static function form(Form $form): Form
     {

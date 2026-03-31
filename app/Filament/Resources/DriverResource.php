@@ -3,12 +3,8 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\DriverResource\Pages;
-use App\Filament\Resources\DriverResource\RelationManagers;
 use App\Models\Driver;
-use Filament\Forms;
 use Filament\Forms\Components\FileUpload;
-use Filament\Forms\Components\Hidden;
-use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Section;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -17,16 +13,11 @@ use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Columns\BadgeColumn;
-use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\ImageColumn;
-use Filament\Tables\Columns\Layout\Split;
 use Filament\Tables\Columns\Layout\Stack;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\ToggleColumn;
-use Filament\Tables\Columns\ViewColumn;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
 
 class DriverResource extends Resource
 {
@@ -127,6 +118,7 @@ class DriverResource extends Resource
 
                         TextColumn::make('phone')
                             ->icon('heroicon-m-phone')
+                            ->color('warning')
                             ->alignCenter(),
 
                         BadgeColumn::make('status')
@@ -175,12 +167,13 @@ class DriverResource extends Resource
             ->searchable()
 
             ->actions([
-                Tables\Actions\ViewAction::make(),
-                Tables\Actions\EditAction::make(),
-                Tables\Actions\DeleteAction::make(),
+                Tables\Actions\EditAction::make()->extraAttributes([
+                    'class' => 'mx-auto'
+                ]),
+                Tables\Actions\DeleteAction::make()->extraAttributes([
+                    'class' => 'mx-auto'
+                ]),
             ])
-
-            ->recordAction('view')
 
             ->paginated(false);
     }

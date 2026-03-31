@@ -31,7 +31,7 @@ class Approval extends Model
         return LogOptions::defaults()
             ->logAll()
             ->logOnlyDirty()
-            ->setDescriptionForEvent(fn(string $eventName) => "Booking {$eventName}");
+            ->setDescriptionForEvent(fn(string $eventName) => "Approval {$eventName}");
     }
 
     public function booking()

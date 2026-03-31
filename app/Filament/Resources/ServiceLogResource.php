@@ -6,12 +6,22 @@ use App\Filament\Resources\ServiceLogResource\Pages;
 use App\Filament\Resources\ServiceLogResource\RelationManagers;
 use App\Models\ServiceLog;
 use Filament\Forms;
+use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Grid;
+use Filament\Forms\Components\Placeholder;
+use Filament\Forms\Components\Section;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\Filter as FiltersFilter;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Illuminate\Support\HtmlString;
 
 class ServiceLogResource extends Resource
 {
@@ -30,91 +40,194 @@ class ServiceLogResource extends Resource
         return $form
             ->schema([
 
-                Forms\Components\Section::make('Service Information')
+                Section::make('Service Information')
                     ->description('Record vehicle maintenance or repair')
                     ->icon('heroicon-o-wrench-screwdriver')
+                    ->collapsible()
                     ->schema([
 
-                        Forms\Components\Select::make('vehicle_id')
-                            ->label('Vehicle')
-                            ->relationship('vehicle', 'plate_number')
-                            ->searchable()
-                            ->preload()
-                            ->required(),
+                        Grid::make(2)
+                            ->schema([
 
-                        Forms\Components\DatePicker::make('service_date')
-                            ->label('Service Date')
-                            ->required(),
+                                Select::make('vehicle_id')
+                                    ->label('Vehicle')
+                                    ->relationship('vehicle', 'plate_number')
+                                    ->searchable()
+                                    ->preload()
+                                    ->required()
+                                    ->reactive()
+                                    ->placeholder('Select a vehicle')
 
-                        Forms\Components\Textarea::make('description')
-                            ->label('Service Description')
-                            ->placeholder('Example: Engine oil replacement')
-                            ->required()
-                            ->columnSpanFull(),
+                                    ->getOptionLabelFromRecordUsing(function ($record) {
+                                        return new HtmlString("
+                                        <div style='display:flex; align-items:center; gap:12px'>
+                                            <img src='" . asset('storage/' . ($record->image ?? 'default-car.png')) . "' 
+                                                onerror=\"this.src='" . asset('images/default-car.png') . "'\"
+                                                style='width:50px; height:50px; object-fit:cover; border-radius:8px;'>
+                                            <div>
+                                                <div style='font-weight:600'>
+                                                    {$record->plate_number}
+                                                </div>
+                                                <div style='font-size:12px; color:gray'>
+                                                    {$record->brand} - {$record->model}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        ");
+                                    })
 
-                        Forms\Components\TextInput::make('cost')
+                                    ->getSearchResultsUsing(function (string $search) {
+                                        return \App\Models\Vehicle::query()
+                                            ->where('plate_number', 'like', "%{$search}%")
+                                            ->orWhere('brand', 'like', "%{$search}%")
+                                            ->limit(10)
+                                            ->get()
+                                            ->mapWithKeys(function ($record) {
+                                                return [
+                                                    $record->id => new HtmlString("
+                                                        <div style='display:flex; align-items:center; gap:12px'>
+                                                            <img src='" . asset('storage/' . ($record->image ?? 'default-car.png')) . "' 
+                                                                onerror=\"this.src='" . asset('images/default-car.png') . "'\"
+                                                                style='width:50px; height:50px; object-fit:cover; border-radius:8px;'>
+                                                            <div>
+                                                                <div style='font-weight:600'>
+                                                                    {$record->plate_number}
+                                                                </div>
+                                                                <div style='font-size:12px; color:gray'>
+                                                                    {$record->brand} - {$record->model}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    ")
+                                                ];
+                                            })
+                                            ->toArray();
+                                    })
+                                    ->allowHtml()
+                                    ->helperText('Choose a vehicle'),
+
+                                DatePicker::make('service_date')
+                                    ->label('Service Date')
+                                    ->required()
+                                    ->default(now())
+                                    ->maxDate(now())
+                                    ->displayFormat('d M Y')
+                                    ->native(false)
+                                    ->closeOnDateSelection()
+                                    ->prefixIcon('heroicon-m-calendar-days'),
+
+                            ]),
+
+                    ]),
+
+                Section::make('Service Details')
+                    ->description('Enter maintenance details')
+                    ->icon('heroicon-o-document-text')
+                    ->collapsible()
+                    ->schema([
+
+                        TextInput::make('cost')
                             ->label('Service Cost')
                             ->numeric()
                             ->prefix('Rp')
-                            ->columnSpanFull(),
+                            ->placeholder('e.g. 500000')
+                            ->required()
+                            ->minValue(0)
+                            ->live(debounce: 500)
+                            ->helperText('Total service cost'),
 
-                    ])
-                    ->columns(2)
+                        Forms\Components\Textarea::make('description')
+                            ->label('Description')
+                            ->placeholder('e.g. Oil change, brake service')
+                            ->rows(3)
+                            ->columnSpanFull()
+                            ->required(),
 
+                    ]),
             ]);
     }
 
     public static function table(Table $table): Table
     {
         return $table
+            ->recordUrl(null)
+            ->recordAction(null)
+            ->striped()
+
             ->columns([
 
-                Tables\Columns\TextColumn::make('vehicle.plate_number')
+                TextColumn::make('vehicle.plate_number')
                     ->label('Vehicle')
+                    ->badge()
+                    ->color('info')
                     ->icon('heroicon-m-truck')
                     ->searchable()
                     ->sortable(),
 
-                Tables\Columns\TextColumn::make('service_date')
+                TextColumn::make('service_date')
                     ->label('Service Date')
-                    ->date()
+                    ->date('d M Y')
+                    ->icon('heroicon-m-calendar-days')
                     ->sortable(),
 
-                Tables\Columns\TextColumn::make('description')
+                TextColumn::make('description')
                     ->label('Description')
-                    ->limit(40),
+                    ->limit(35)
+                    ->tooltip(fn($record) => $record->description)
+                    ->icon('heroicon-m-document-text'),
 
-                Tables\Columns\TextColumn::make('cost')
+                TextColumn::make('cost')
                     ->label('Cost')
-                    ->money('IDR')
+                    ->money('IDR', true)
+                    ->icon('heroicon-m-banknotes')
+                    ->color(
+                        fn($state) =>
+                        $state > 1000000 ? 'danger' : ($state > 500000 ? 'warning' : 'success')
+                    )
                     ->sortable(),
 
-                Tables\Columns\TextColumn::make('odometer')
-                    ->label('Odometer')
-                    ->suffix(' km')
-                    ->sortable(),
-
-                Tables\Columns\TextColumn::make('created_at')
+                TextColumn::make('created_at')
                     ->label('Logged At')
-                    ->dateTime('d M Y')
-                    ->toggleable(),
+                    ->since()
+                    ->tooltip(fn($record) => $record->created_at?->format('d M Y H:i'))
+                    ->icon('heroicon-m-clock'),
 
             ])
+
             ->filters([
 
-                Tables\Filters\SelectFilter::make('vehicle')
+                SelectFilter::make('vehicle_id')
+                    ->label('Vehicle')
                     ->relationship('vehicle', 'plate_number')
-                    ->label('Vehicle'),
+                    ->searchable()
+                    ->preload(),
+
+                FiltersFilter::make('date_range')
+                    ->form([
+                        DatePicker::make('from')->label('From Date'),
+                        DatePicker::make('until')->label('Until Date'),
+                    ])
+                    ->query(function (Builder $query, array $data) {
+                        return $query
+                            ->when(
+                                $data['from'],
+                                fn($q) => $q->whereDate('service_date', '>=', $data['from'])
+                            )
+                            ->when(
+                                $data['until'],
+                                fn($q) => $q->whereDate('service_date', '<=', $data['until'])
+                            );
+                    }),
 
             ])
-            ->actions([
-                Tables\Actions\ViewAction::make(),
-                Tables\Actions\EditAction::make(),
-                Tables\Actions\DeleteAction::make(),
-            ])
+
+            ->actions([])
+
             ->bulkActions([
-                Tables\Actions\DeleteBulkAction::make()
-            ]);
+                Tables\Actions\DeleteBulkAction::make(),
+            ])
+
+            ->defaultSort('service_date', 'desc');
     }
 
     public static function getRelations(): array

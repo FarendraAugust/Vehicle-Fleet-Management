@@ -23,6 +23,7 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Filament\Tables\Enums\ActionsPosition;
 
 class VehicleResource extends Resource
 {
@@ -61,7 +62,6 @@ class VehicleResource extends Resource
                                     ->placeholder('AG 3157 CE')
                                     ->required()
                                     ->maxLength(20)
-                                    ->uppercase()
                                     ->unique(ignoreRecord: true),
 
                                 TextInput::make('year')
@@ -125,110 +125,72 @@ class VehicleResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
-            ->contentGrid([
-                'sm' => 1,
-                'md' => 2,
-                'lg' => 3,
-                'xl' => 4,
-                '2xl' => 5,
-            ])
-
             ->columns([
-                Stack::make([
 
-                    ImageColumn::make('image')
-                        ->disk('public')
-                        ->height(150)
-                        ->width('100%')
-                        ->alignCenter(),
-
-                    Stack::make([
-
-                        Split::make([
-                            TextColumn::make('brand')
-                                ->weight('bold')
-                                ->size(TextColumn\TextColumnSize::Large)
-                                ->alignCenter(),
-
-                            TextColumn::make('model')
-                                ->color('gray')
-                                ->alignCenter(),
-                        ]),
-
-                        TextColumn::make('plate_number')
-                            ->label('Plate')
-                            ->icon('heroicon-m-truck')
-                            ->weight('bold')
-                            ->alignCenter(),
-
-                    ])->space(1),
-
-                    Split::make([
-                        BadgeColumn::make('vehicle_type')
-                            ->label('Type')
-                            ->colors([
-                                'primary' => 'people',
-                                'warning' => 'goods',
-                            ])
-                            ->alignCenter(),
-
-                        BadgeColumn::make('ownership')
-                            ->label('Ownership')
-                            ->colors([
-                                'success' => 'company',
-                                'gray' => 'rental',
-                            ])
-                            ->alignCenter(),
+                ImageColumn::make('image')
+                    ->disk('public')
+                    ->height(120)
+                    ->square()
+                    ->extraImgAttributes([
+                        'class' => 'rounded-lg object-cover'
                     ]),
 
-                    Stack::make([
+                TextColumn::make('plate_number')
+                    ->label('Plate')
+                    ->weight('bold')
+                    ->size('sm')
+                    ->searchable(),
 
-                        TextColumn::make('region.name')
-                            ->icon('heroicon-m-map-pin')
-                            ->label('Region')
-                            ->alignCenter(),
+                TextColumn::make('brand')
+                    ->label('Brand')
+                    ->size('xs')
+                    ->color('gray')
+                    ->icon('heroicon-m-building-office')
+                    ->searchable(),
 
-                        TextColumn::make('year')
-                            ->icon('heroicon-m-calendar')
-                            ->label('Year')
-                            ->alignCenter(),
+                TextColumn::make('model')
+                    ->size('xs')
+                    ->color('gray')
+                    ->icon('heroicon-m-cog-6-tooth')
+                    ->searchable(),
 
-                        TextColumn::make('current_odometer')
-                            ->icon('heroicon-m-chart-bar')
-                            ->numeric()
-                            ->suffix(' km')
-                            ->alignCenter(),
+                TextColumn::make('year')
+                    ->size('xs')
+                    ->color('gray')
+                    ->icon('heroicon-m-calendar')
+                    ->searchable(),
 
-                    ])->space(1),
+                BadgeColumn::make('vehicle_type')
+                    ->label('Type')
+                    ->size('sm')
+                    ->formatStateUsing(fn($state) => ucfirst($state))
+                    ->colors([
+                        'warning' => 'people',
+                        'success' => 'goods',
+                    ]),
 
-                    BadgeColumn::make('status')
-                        ->alignCenter()
-                        ->label('Status')
-                        ->colors([
-                            'success' => 'available',
-                            'warning' => 'in_use',
-                            'danger' => 'maintenance',
-                        ])
-                        ->formatStateUsing(fn($state) => ucfirst(str_replace('_', ' ', $state)))
-                        ->alignCenter(),
+                BadgeColumn::make('ownership')
+                    ->label('Owner')
+                    ->size('sm')
+                    ->formatStateUsing(fn($state) => ucfirst($state))
+                    ->colors([
+                        'primary' => 'company',
+                        'info' => 'rental',
+                    ]),
 
-                ])
-                    ->space(2)
+                TextColumn::make('region.name')
+                    ->label('Region')
+                    ->size('xs')
+                    ->formatStateUsing(fn($state) => ucfirst($state))
+                    ->icon('heroicon-m-map-pin'),
 
-                    ->extraAttributes(fn($record) => [
-                        'class' => '
-                    p-6
-                    hover:shadow-xl
-                    hover:-translate-y-1
-                    transition
-                    min-h-[360px]
-                '
-                            .
-                            match ($record->status) {
-                                'available' => ' border-green-500',
-                                'maintenance' => ' border-red-500',
-                                default => ' border-yellow-400',
-                            }
+                BadgeColumn::make('status')
+                    ->size('sm')
+                    ->formatStateUsing(fn($state) => str($state)->replace('_', ' ')->title())
+                    ->colors([
+                        'success' => 'available',
+                        'warning' => 'in_use',
+                        'danger' => 'maintenance',
                     ]),
             ])
 
@@ -256,14 +218,9 @@ class VehicleResource extends Resource
             ->searchable()
 
             ->actions([
-                Tables\Actions\ViewAction::make(),
                 Tables\Actions\EditAction::make(),
                 Tables\Actions\DeleteAction::make(),
-            ])
-
-            ->recordAction('view')
-
-            ->paginated(false);
+            ]);
     }
 
     public static function getRelations(): array
