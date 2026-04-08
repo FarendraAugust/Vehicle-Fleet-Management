@@ -18,6 +18,7 @@ use Filament\Tables\Columns\Layout\Stack;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\ToggleColumn;
 use Filament\Tables\Table;
+use Illuminate\Support\Facades\Auth;
 
 class DriverResource extends Resource
 {
@@ -70,6 +71,7 @@ class DriverResource extends Resource
 
                         Select::make('status')
                             ->label('Driver Status')
+                            ->visible(false)
                             ->options([
                                 'available' => 'Available',
                                 'assigned' => 'Assigned',
@@ -170,9 +172,10 @@ class DriverResource extends Resource
                 Tables\Actions\EditAction::make()->extraAttributes([
                     'class' => 'mx-auto'
                 ]),
-                Tables\Actions\DeleteAction::make()->extraAttributes([
-                    'class' => 'mx-auto'
-                ]),
+                Tables\Actions\DeleteAction::make()
+                    ->extraAttributes([
+                        'class' => 'mx-auto'
+                    ]),
             ])
 
             ->paginated(false);

@@ -3,7 +3,6 @@
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\DB;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\Models\Permission;
 
@@ -11,26 +10,44 @@ class RoleHasPermissionsSeeder extends Seeder
 {
     public function run(): void
     {
-        // 🔥 reset cache dulu
         app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
 
-        $permissions = Permission::all();
+        // 🔥 APPROVER (PERSIS SESUAI DATA LAMA)
+        $permissionIds = [
+            ...range(25, 36),
+            ...range(49, 60),
+            ...range(91, 102),
+            129,
+            130
+        ];
 
-        // 🔥 ROLE 1 & 2 = FULL ACCESS
-        foreach ([1, 2] as $roleId) {
-            $role = Role::find($roleId);
-            $role?->syncPermissions($permissions);
-        }
+        $permissionAdminExcept = [
+            ...range(91, 102)
+        ];
 
-        // 🔥 ROLE 3 = CUSTOM (sesuai data lo)
-        $role3Permissions = Permission::whereIn('id', [
-            25,26,27,28,29,30,31,32,33,34,35,36,
-            49,50,51,52,53,54,55,56,57,58,59,60,
-            91,92,93,94,95,96,97,98,99,100,101,102,
-            129,130
-        ])->get();
+        // ambil NAME dari ID (biar aman untuk Shield)
+        $permissionNames = Permission::whereIn('id', $permissionIds)
+            ->pluck('name')
+            ->toArray();
 
-        $role3 = Role::find(3);
-        $role3?->syncPermissions($role3Permissions);
+        $permissionNamesAdmin = Permission::whereIn('id', $permissionAdminExcept)
+            ->pluck('name')
+            ->toArray();
+
+        $approverPermissions = Permission::whereIn('name', $permissionNames)->get();
+
+        // 🔥 SUPER ADMIN = FULL ACCESS
+        $superAdmin = Role::where('name', 'super_admin')->first();
+        $superAdmin?->syncPermissions(Permission::all());
+
+        // 🔥 ADMIN = SEMUA KECUALI APPROVAL
+        $adminPermissions = Permission::whereNotIn('name', $permissionNamesAdmin)->get();
+
+        $admin = Role::where('name', 'admin')->first();
+        $admin?->syncPermissions($adminPermissions);
+
+        // 🔥 APPROVER
+        $approver = Role::where('name', 'approver')->first();
+        $approver?->syncPermissions($approverPermissions);
     }
 }

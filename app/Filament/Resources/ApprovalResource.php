@@ -4,8 +4,10 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\ApprovalResource\Pages;
 use App\Models\Approval;
+use App\Models\Booking;
 use App\Models\Vehicle;
 use Carbon\Carbon;
+use Filament\Actions\ViewAction;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Infolists\Components\ImageEntry;
@@ -24,6 +26,7 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
 use Filament\Infolists\Components\Section as InfoSection;
+use Illuminate\Support\Facades\Auth as FacadesAuth;
 
 class ApprovalResource extends Resource
 {
@@ -39,7 +42,12 @@ class ApprovalResource extends Resource
 
     public static function getNavigationBadge(): ?string
     {
-        return static::getModel()::where('status', 'pending')->count();
+        $userId = Auth::id();
+
+        return Booking::whereHas('approvals', function ($query) use ($userId) {
+            $query->where('approver_id', $userId)
+                ->where('status', 'pending');
+        })->count();
     }
 
     public static function canCreate(): bool
@@ -179,11 +187,157 @@ class ApprovalResource extends Resource
 
             ->actions([
 
-                Tables\Actions\ViewAction::make()
+                Tables\Actions\Action::make('view')
+                    ->modalSubmitAction(false)
+                    ->modalCancelActionLabel('Close')
                     ->label('View')
                     ->icon('heroicon-m-eye')
                     ->color('gray')
-                    ->size('lg'),
+                    ->modalHeading('Approval Detail')
+                    ->modalWidth('4xl')
+                    ->infolist([
+
+                        InfoSection::make('Booking Information')
+                            ->icon('heroicon-o-truck')
+                            ->schema([
+
+                                // 🚗 VEHICLE
+                                ImageEntry::make('vehicle_image')
+                                    ->label('Vehicle')
+                                    ->inlineLabel()
+                                    ->state(fn($record) => $record->booking->vehicle?->image),
+
+                                TextEntry::make('vehicle')
+                                    ->label('')
+                                    ->inlineLabel()
+                                    ->formatStateUsing(function ($record) {
+
+                                        $vehicle = $record->vehicle;
+
+                                        if (!$vehicle) return '-';
+
+                                        return "
+                        <div>
+                            <div style='font-weight:600'>
+                                {$vehicle->plate_number}
+                            </div>
+                            <div style='font-size:12px; color:gray'>
+                                {$vehicle->brand} {$vehicle->model}
+                            </div>
+                        </div>
+                    ";
+                                    })
+                                    ->html(),
+
+                                // 👨 DRIVER
+                                ImageEntry::make('driver_image')
+                                    ->label('Driver')
+                                    ->inlineLabel()
+                                    ->circular()
+                                    ->state(fn($record) => $record->booking->driver?->image),
+
+                                TextEntry::make('driver')
+                                    ->label('')
+                                    ->inlineLabel()
+                                    ->formatStateUsing(function ($record) {
+                                        $driver = $record->driver;
+
+                                        if (!$driver) return '-';
+
+                                        return "
+                        <div>
+                            <div style='font-weight:600'>
+                                {$driver->name}
+                            </div>
+                            <div style='font-size:12px; color:gray'>
+                                {$driver->phone}
+                            </div>
+                        </div>
+                    ";
+                                    })
+                                    ->html(),
+
+                                TextEntry::make('destination')
+                                    ->label('Destination')
+                                    ->inlineLabel()
+                                    ->badge()
+                                    ->icon('heroicon-m-map-pin')
+                                    ->state(fn($record) => $record->booking->destination),
+
+                                TextEntry::make('purpose')
+                                    ->label('Purpose')
+                                    ->inlineLabel()
+                                    ->badge()
+                                    ->columnSpanFull()
+                                    ->color('gray')
+                                    ->state(fn($record) => $record->booking->purpose),
+
+                                TextEntry::make('schedule')
+                                    ->label('Schedule')
+                                    ->inlineLabel()
+                                    ->badge()
+                                    ->icon('heroicon-m-calendar-date-range')
+                                    ->state(
+                                        fn($record) =>
+                                        \Carbon\Carbon::parse($record->booking->start_date)->format('d M H:i')
+                                            . ' → ' .
+                                            \Carbon\Carbon::parse($record->booking->end_date)->format('d M H:i')
+                                    ),
+
+                                TextEntry::make('booking_status')
+                                    ->label('Booking Status')
+                                    ->inlineLabel()
+                                    ->badge()
+                                    ->state(fn($record) => ucfirst($record->booking->status))
+                                    ->color(fn($record) => match ($record->booking->status) {
+                                        'pending' => 'warning',
+                                        'approved' => 'success',
+                                        'rejected' => 'danger',
+                                        default => 'gray',
+                                    }),
+
+                            ])
+                            ->columns(2),
+
+                        // 🔥 KHAS APPROVAL
+                        InfoSection::make('Approval Information')
+                            ->icon('heroicon-o-check-badge')
+                            ->schema([
+
+                                TextEntry::make('level')
+                                    ->label('Approval Level')
+                                    ->badge()
+                                    ->inlineLabel()
+                                    ->color(fn($state) => $state == 1 ? 'info' : 'warning'),
+
+                                TextEntry::make('status')
+                                    ->label('Approval Status')
+                                    ->inlineLabel()
+                                    ->badge()
+                                    ->formatStateUsing(fn($state) => ucfirst($state))
+                                    ->color(fn($state) => match ($state) {
+                                        'pending' => 'warning',
+                                        'approved' => 'success',
+                                        'rejected' => 'danger',
+                                    }),
+
+                                TextEntry::make('notes')
+                                    ->label('Notes')
+                                    ->badge()
+                                    ->inlineLabel()
+                                    ->columnSpanFull()
+                                    ->color('gray')
+                                    ->state(fn($record) => $record->notes ?? '-'),
+
+                                TextEntry::make('approved_at')
+                                    ->label('Approved At')
+                                    ->inlineLabel()
+                                    ->dateTime('d M Y H:i')
+                                    ->placeholder('-'),
+
+                            ])
+                            ->columns(2),
+                    ]),
 
                 Tables\Actions\Action::make('reject')
                     ->label('Reject')
@@ -236,6 +390,16 @@ class ApprovalResource extends Resource
                                 'status' => 'rejected'
                             ]);
                         }
+
+                        activity('approval')
+                            ->causedBy(Auth::user())
+                            ->performedOn($record)
+                            ->event('rejected')
+                            ->withProperties([
+                                'booking_id' => $record->booking_id,
+                                'approval_id' => $record->id,
+                            ])
+                            ->log('Approval rejected');
                     }),
 
                 Tables\Actions\Action::make('approve')
@@ -281,6 +445,17 @@ class ApprovalResource extends Resource
                                 ]);
                             }
                         }
+
+                        activity('approval')
+                            ->causedBy(Auth::user())
+                            ->performedOn($record)
+                            ->event('approved')
+                            ->withProperties([
+                                'booking_id' => $record->booking_id,
+                                'approval_id' => $record->id,
+                                'notes' => $data['notes'] ?? null,
+                            ])
+                            ->log('Approval approved');
                     })
 
             ])
@@ -329,7 +504,6 @@ class ApprovalResource extends Resource
     {
         return [
             'index' => Pages\ListApprovals::route('/'),
-            'view' => Pages\ViewApproval::route('/{record}'),
         ];
     }
 }

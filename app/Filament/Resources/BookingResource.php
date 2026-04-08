@@ -201,7 +201,10 @@ class BookingResource extends Resource
 
                         Select::make('approver_level_1')
                             ->label('Approver Level 1')
-                            ->options(User::pluck('name', 'id'))
+                            ->options(
+                                User::whereHas('roles', fn($q) => $q->where('id', 3))
+                                    ->pluck('name', 'id')
+                            )
                             ->searchable()
                             ->placeholder('Select first approver')
                             ->required()
@@ -209,7 +212,10 @@ class BookingResource extends Resource
 
                         Select::make('approver_level_2')
                             ->label('Approver Level 2')
-                            ->options(User::pluck('name', 'id'))
+                            ->options(
+                                User::whereHas('roles', fn($q) => $q->where('id', 3))
+                                    ->pluck('name', 'id')
+                            )
                             ->searchable()
                             ->placeholder('Select second approver')
                             ->required()
@@ -329,17 +335,153 @@ class BookingResource extends Resource
                         'pending' => 'Pending',
                         'approved' => 'Approved',
                         'rejected' => 'Rejected',
+                        'completed' => 'Completed',
                     ])
                     ->indicator('Status'),
 
             ])
 
             ->actions([
-                Tables\Actions\ViewAction::make()
+                Tables\Actions\Action::make('view')
+                    ->modalSubmitAction(false)
+                    ->modalCancelActionLabel('Close')
+                    ->label('View')
                     ->icon('heroicon-m-eye')
                     ->color('gray')
-                    ->label('View')
-                    ->tooltip('View Booking'),
+                    ->modalHeading('Booking Detail')
+                    ->modalWidth('4xl')
+                    ->infolist([
+
+                        InfoSection::make('Booking Information')
+                            ->description('Fill in the booking details for the vehicle request.')
+                            ->icon('heroicon-o-truck')
+                            ->schema([
+
+                                // 🔥 VEHICLE (image + text kayak select)
+                                ImageEntry::make('vehicle_image')
+                                    ->label('Vehicle')
+                                    ->inlineLabel()
+                                    ->state(fn($record) => $record->vehicle->image),
+
+                                TextEntry::make('vehicle')
+                                    ->label('')
+                                    ->inlineLabel()
+                                    ->formatStateUsing(function ($record) {
+                                        $vehicle = $record->vehicle;
+
+                                        if (!$vehicle) return '-';
+
+                                        return "
+                        <div>
+                            <div style='font-weight:600'>
+                                {$vehicle->plate_number}
+                            </div>
+                            <div style='font-size:12px; color:gray'>
+                                {$vehicle->brand} {$vehicle->model}
+                            </div>
+                        </div>
+                    ";
+                                    })
+                                    ->html(),
+
+                                ImageEntry::make('driver_image')
+                                    ->label('Driver')
+                                    ->inlineLabel()
+                                    ->state(fn($record) => $record->driver->image)
+                                    ->circular(),
+
+                                // 🔥 DRIVER (kayak select)
+                                TextEntry::make('driver')
+                                    ->label('')
+                                    ->inlineLabel()
+                                    ->formatStateUsing(function ($record) {
+                                        $driver = $record->driver;
+
+                                        if (!$driver) return '-';
+
+                                        return "
+                        <div>
+                            <div style='font-weight:600'>
+                                {$driver->name}
+                            </div>
+                            <div style='font-size:12px; color:gray'>
+                                {$driver->phone}
+                            </div>
+                        </div>
+                    ";
+                                    })
+                                    ->html(),
+
+                                TextEntry::make('destination')
+                                    ->label('Destination')
+                                    ->badge()
+                                    ->icon('heroicon-m-map-pin')
+                                    ->inlineLabel(),
+
+                                TextEntry::make('purpose')
+                                    ->label('Purpose')
+                                    ->inlineLabel()
+                                    ->badge()
+                                    ->columnSpanFull()
+                                    ->color('gray'),
+
+                                TextEntry::make('start_date')
+                                    ->label('Start Date')
+                                    ->inlineLabel()
+                                    ->badge()
+                                    ->icon('heroicon-m-calendar-date-range')
+                                    ->dateTime('Y-m-d H:i'),
+
+                                TextEntry::make('end_date')
+                                    ->label('End Date')
+                                    ->inlineLabel()
+                                    ->badge()
+                                    ->icon('heroicon-m-calendar-date-range')
+                                    ->dateTime('Y-m-d H:i'),
+
+                                TextEntry::make('status')
+                                    ->label('Status')
+                                    ->inlineLabel()
+                                    ->badge()
+                                    ->formatStateUsing(fn ($state) => ucfirst($state))
+                                    ->color(fn($state) => match ($state) {
+                                        'pending' => 'warning',
+                                        'approved' => 'success',
+                                        'rejected' => 'danger',
+                                        'completed' => 'primary',
+                                        'canceled' => 'danger',
+                                    }),
+
+                            ])
+                            ->columns(2),
+
+                        InfoSection::make('Approval Configuration')
+                            ->description('Select the approvers responsible for reviewing this booking.')
+                            ->icon('heroicon-o-check-badge')
+                            ->schema([
+
+                                TextEntry::make('approver_1')
+                                    ->label('Approver Level 1')
+                                    ->badge()
+                                    ->inlineLabel()
+                                    ->state(
+                                        fn($record) =>
+                                        optional($record->approvals->where('level', 1)->first()?->approver)->name ?? '-'
+                                    ),
+
+                                TextEntry::make('approver_2')
+                                    ->label('Approver Level 2')
+                                    ->badge()
+                                    ->color('warning')
+                                    ->inlineLabel()
+                                    ->state(
+                                        fn($record) =>
+                                        optional($record->approvals->where('level', 2)->first()?->approver)->name ?? '-'
+                                    ),
+
+                            ])
+                            ->columns(2),
+                    ]),
 
                 Tables\Actions\Action::make('cancel')
                     ->label('Cancel Booking')
@@ -410,7 +552,6 @@ class BookingResource extends Resource
         return [
             'index' => Pages\ListBookings::route('/'),
             'create' => Pages\CreateBooking::route('/create'),
-            'view' => Pages\ViewBooking::route('/view/{record}'),
         ];
     }
 }

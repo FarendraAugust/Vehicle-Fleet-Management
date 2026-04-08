@@ -16,6 +16,18 @@ Aplikasi ini dibuat untuk membantu perusahaan dalam mengelola kendaraan, melakuk
 
 ---
 
+## 📊 Activity Diagram
+
+Berikut adalah alur aktivitas sistem:
+
+![Activity Diagram](activity.png)
+
+## 🗄️ Physical Data Model
+
+Struktur database yang digunakan dalam sistem:
+
+![Physical Data Model](physicaldata.png)
+
 # 👤 Akun Login
 
 Gunakan akun berikut untuk mengakses sistem.
@@ -123,7 +135,7 @@ http://127.0.0.1:8000
 
 * Anda Dapat melihat dashboard
 * Anda dapat menyetujui pemesanan di menu approvals
-* Anda dapat  melihat semua logs aplikasi melalui menu activity logs (saat ini belum berfungsi)
+* Anda dapat  melihat semua logs aplikasi melalui menu activity logs
 
 ---
 

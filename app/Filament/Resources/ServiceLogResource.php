@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\ServiceLogResource\Pages;
 use App\Filament\Resources\ServiceLogResource\RelationManagers;
 use App\Models\ServiceLog;
+use Filament\Actions\DeleteAction;
 use Filament\Forms;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Grid;
@@ -15,6 +16,8 @@ use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
+use Filament\Tables\Actions\DeleteAction as ActionsDeleteAction;
+use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\Filter as FiltersFilter;
 use Filament\Tables\Filters\SelectFilter;
@@ -156,19 +159,35 @@ class ServiceLogResource extends Resource
 
             ->columns([
 
-                TextColumn::make('vehicle.plate_number')
+                ImageColumn::make('image')
+                    ->size(40)
+                    ->label('')
+                    ->state(fn($record) => $record->vehicle?->image),
+
+                TextColumn::make('vehicle')
                     ->label('Vehicle')
-                    ->badge()
-                    ->color('info')
-                    ->icon('heroicon-m-truck')
-                    ->searchable()
-                    ->sortable(),
+                    ->weight('bold')
+                    ->searchable(query: function ($query, $search) {
+                        $query->whereHas('vehicle', function ($q) use ($search) {
+                            $q->where('plate_number', 'like', "%{$search}%")
+                                ->orWhere('brand', 'like', "%{$search}%")
+                                ->orWhere('model', 'like', "%{$search}%");
+                        });
+                    })
+                    ->description(
+                        fn($record) =>
+                        optional($record->vehicle)->brand . ' ' .
+                            optional($record->vehicle)->model
+                    )
+                    ->state(
+                        fn($record) =>
+                        optional($record->vehicle)->plate_number
+                    ),
 
                 TextColumn::make('service_date')
                     ->label('Service Date')
                     ->date('d M Y')
-                    ->icon('heroicon-m-calendar-days')
-                    ->sortable(),
+                    ->icon('heroicon-m-calendar-days'),
 
                 TextColumn::make('description')
                     ->label('Description')
@@ -221,7 +240,10 @@ class ServiceLogResource extends Resource
 
             ])
 
-            ->actions([])
+            ->actions([
+                Tables\Actions\ViewAction::make(),
+                Tables\Actions\DeleteAction::make(),
+            ])
 
             ->bulkActions([
                 Tables\Actions\DeleteBulkAction::make(),

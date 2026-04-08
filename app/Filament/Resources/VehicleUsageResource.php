@@ -13,6 +13,7 @@ use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Filament\Tables\Columns\TextColumn;
+use Illuminate\Support\Facades\Auth;
 
 class VehicleUsageResource extends Resource
 {
@@ -168,6 +169,15 @@ class VehicleUsageResource extends Resource
                             'status' => 'available',
                             'current_odometer' => $data['end_odometer']
                         ]);
+
+                        activity('vehicle return')
+                            ->causedBy(Auth::user())
+                            ->performedOn($record)
+                            ->event('returned')
+                            ->withProperties([
+                                'vehicle_id' => $record->id,
+                            ])
+                            ->log('Vehicle #' . $record->id . ' returned');
                     })
             ])
             ->paginated(false);

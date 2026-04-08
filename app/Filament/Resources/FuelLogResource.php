@@ -22,6 +22,7 @@ use Filament\Tables\Table;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables;
 use Filament\Tables\Actions\DeleteAction;
+use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Enums\FiltersLayout;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
@@ -111,8 +112,8 @@ class FuelLogResource extends Resource
                                 DatePicker::make('date')
                                     ->label('Fuel Date')
                                     ->required()
-                                    ->default(now())
-                                    ->maxDate(now())
+                                    ->default(Carbon::now())
+                                    ->maxDate(Carbon::now())
                                     ->displayFormat('d M Y')
                                     ->native(false)
                                     ->closeOnDateSelection()
@@ -189,19 +190,35 @@ class FuelLogResource extends Resource
             ->striped()
             ->columns([
 
-                TextColumn::make('vehicle.plate_number')
+                ImageColumn::make('image')
+                    ->size(40)
+                    ->label('')
+                    ->state(fn($record) => $record->vehicle?->image),
+
+                TextColumn::make('vehicle')
                     ->label('Vehicle')
-                    ->badge()
-                    ->color('info')
-                    ->icon('heroicon-m-truck')
-                    ->searchable()
-                    ->sortable(),
+                    ->weight('bold')
+                    ->searchable(query: function ($query, $search) {
+                        $query->whereHas('vehicle', function ($q) use ($search) {
+                            $q->where('plate_number', 'like', "%{$search}%")
+                                ->orWhere('brand', 'like', "%{$search}%")
+                                ->orWhere('model', 'like', "%{$search}%");
+                        });
+                    })
+                    ->description(
+                        fn($record) =>
+                        optional($record->vehicle)->brand . ' ' .
+                            optional($record->vehicle)->model
+                    )
+                    ->state(
+                        fn($record) =>
+                        optional($record->vehicle)->plate_number
+                    ),
 
                 TextColumn::make('date')
                     ->label('Date')
                     ->date('d M Y')
-                    ->icon('heroicon-m-calendar-days')
-                    ->sortable(),
+                    ->icon('heroicon-m-calendar-days'),
 
                 TextColumn::make('fuel_amount')
                     ->label('Fuel')
@@ -255,6 +272,8 @@ class FuelLogResource extends Resource
             ])
 
             ->actions([
+                Tables\Actions\ViewAction::make()
+                ->color('gray'),
                 DeleteAction::make(),
             ])
 

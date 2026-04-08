@@ -4,8 +4,6 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Spatie\Activitylog\LogOptions;
-use Spatie\Activitylog\Traits\LogsActivity;
 
 class Approval extends Model
 {
@@ -23,16 +21,6 @@ class Approval extends Model
     protected $casts = [
         'approved_at' => 'datetime',
     ];
-
-    use LogsActivity;
-
-    public function getActivitylogOptions(): LogOptions
-    {
-        return LogOptions::defaults()
-            ->logAll()
-            ->logOnlyDirty()
-            ->setDescriptionForEvent(fn(string $eventName) => "Approval {$eventName}");
-    }
 
     public function booking()
     {
@@ -57,5 +45,15 @@ class Approval extends Model
             'approver_id' => 3,
             'level' => 2,
         ]);
+    }
+
+    public function getVehicleAttribute()
+    {
+        return $this->booking?->vehicle;
+    }
+
+    public function getDriverAttribute()
+    {
+        return $this->booking?->driver;
     }
 }
